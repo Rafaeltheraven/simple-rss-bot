@@ -12,3 +12,8 @@ The first line of `token` should hold your bot token, the second line should hol
 
 # Schedule
 Simply run the program through a cronjob or some other scheduling system.
+
+# Install
+Simply run `pip install -r requirements.txt`
+
+This program has only been tested on Python 3
