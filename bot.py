@@ -49,7 +49,7 @@ def check_feed():
 		feed = feedparser.parse(url)
 		has = sha1(dumps(feed.entries).encode()).hexdigest()
 		if check_new(conn, url, has):
-			message = "[" + feed.feed.title + "] \n \n"
+			message = "**" + feed.feed.title + "** \n \n"
 			message += "[" + feed.entries[0].title + "](" + feed.entries[0].link + ") \n \n"
 			desc = feed.entries[0].description
 			parsed = feedparser.parse(desc)
