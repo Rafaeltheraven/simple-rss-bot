@@ -11,7 +11,7 @@ There are 2 files you need to populate. `urls` and `token`.
 The first line of `token` should hold your bot token, the second line should hold your chat id.
 
 # Schedule
-Simply run the program through a cronjob or some other scheduling system.
+Simply run `bot.py` through a cronjob or some other scheduling system.
 
 # Install
 Simply run `pip install -r requirements.txt`
