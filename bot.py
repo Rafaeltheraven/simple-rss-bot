@@ -44,6 +44,8 @@ def check_feed():
 	bot, chat = init_bot()
 
 	for url in content:
+		if url == "":
+			continue
 		feed = feedparser.parse(url)
 		has = sha1(dumps(feed.entries).encode()).hexdigest()
 		if check_new(conn, url, has):
