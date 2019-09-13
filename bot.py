@@ -25,12 +25,14 @@ def check_new(conn, url, title):
 	c.execute(sql, [url])
 	ids = c.fetchone()
 	new = False
+	send = False
 	if not ids:
 		sql = "INSERT INTO feeds (URL) VALUES (?);"
 		c.execute(sql, [url])
 		sql = "INSERT INTO entries (Feed, Title) VALUES (?, ?);"
 		c.execute(sql, [c.lastrowid, title])
-		new = False
+		new = True
+		send = False
 	else:
 		sql = "SELECT Title FROM entries WHERE Feed = ? AND Title = ?"
 		c.execute(sql, [ids[0], title])
@@ -38,18 +40,16 @@ def check_new(conn, url, title):
 		if not result:
 			sql = "INSERT INTO entries (Feed, Title) VALUES (?, ?);"
 			c.execute(sql, [ids[0], title])
-			new = True
+			send = True
 	conn.commit()
-	return new
+	return new, send
 
 def check_feed():
 	conn = connect_to_db()
 	with open("urls") as f:
 		content = f.readlines()
 		content = [x.strip() for x in content]
-
 	bot, chat = init_bot()
-
 	for url in content:
 		if url == "":
 			continue
@@ -58,7 +58,13 @@ def check_feed():
 			title = entry.title
 			desc = entry.description
 			link = entry.link
-			if check_new(conn, url, title):
+			new, send = check_new(conn, url, title)
+			if new:
+				for entry in feed['entries']:
+					title = entry.title
+					check_new(conn, url, title)
+				break
+			elif send:
 				message = "**" + feed.feed.title + "** \n \n"
 				message += "[" + title + "](" + link + ") \n \n"
 				parsed = feedparser.parse(desc)
