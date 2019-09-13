@@ -14,24 +14,33 @@ def connect_to_db():
 def create_db():
 	conn = sqlite3.connect('simple.db')
 	c = conn.cursor()
-	c.execute('''CREATE TABLE feeds (url VARCHAR(2083) PRIMARY KEY, hash VARCHAR(40));''')
+	c.execute('''CREATE TABLE feeds (ID INTEGER PRIMARY KEY, URL VARCHAR(2083) UNIQUE);''')
+	c.execute('''CREATE TABLE entries (ID INTEGER PRIMARY KEY, Feed INTEGER, Title VARCHAR(2083) UNIQUE, FOREIGN KEY(Feed) REFERENCES feeds(ID));''')
 	conn.commit()
 	conn.close()
 
-def check_new(conn, feed, has):
+def check_new(conn, url, title):
 	c = conn.cursor()
-	sql = "SELECT hash FROM feeds WHERE url = ?;"
-	c.execute(sql, [feed])
-	ha = c.fetchone()
-	new = False
-	if not ha:
-		sql = "INSERT INTO feeds (url, hash) VALUES (?, ?);"
-		c.execute(sql, (feed, has))
-		new = True
-	elif ha != has:
-		sql = "UPDATE feeds SET hash = ? WHERE url = ?;"
-		c.execute(sql, (has, feed))
-		new = True
+	sql = "SELECT ID FROM feeds WHERE URL = ?"
+	c.execute(sql, [url])
+	ids = c.fetchone()
+	new = True
+	if not ids:
+		sql = "INSERT INTO feeds (URL) VALUES (?);"
+		c.execute(sql, [url])
+		sql = "INSERT INTO entries (Feed, Title) VALUES (?, ?);"
+		c.execute(sql, [c.lastrowid, title])
+	else:
+		sql = "SELECT Title FROM entries WHERE Feed = ?"
+		c.execute(sql, [ids[0]])
+		result = c.fetchall()
+		for res in result:
+			if res[0] == title:
+				new = False
+				break
+		if new:
+			sql = "INSERT INTO entries (Feed, Title) VALUES (?, ?);"
+			c.execute(sql, [ids[0], title])
 	conn.commit()
 	return new
 
@@ -47,21 +56,26 @@ def check_feed():
 		if url == "":
 			continue
 		feed = feedparser.parse(url)
-		has = sha1(dumps(feed.entries).encode()).hexdigest()
-		if check_new(conn, url, has):
-			message = "**" + feed.feed.title + "** \n \n"
-			message += "[" + feed.entries[0].title + "](" + feed.entries[0].link + ") \n \n"
-			desc = feed.entries[0].description
-			parsed = feedparser.parse(desc)
-			try:
-				src = parsed['feed']['img']['src']
-				if len(message) > 1024:
-					message = message[:1020]
-					message += "..."
-				bot.send_photo(chat_id=chat, photo=src, caption=message, parse_mode=telegram.ParseMode.MARKDOWN)
-			except:	
-				message += html2markdown.convert(feed.entries[0].description)
-				send_message(message, bot, chat)
+		for entry in feed['entries']:
+			title = entry.title
+			desc = entry.description
+			link = entry.link
+			if check_new(conn, url, title):
+				message = "**" + feed.feed.title + "** \n \n"
+				message += "[" + title + "](" + link + ") \n \n"
+				parsed = feedparser.parse(desc)
+				try:
+					src = parsed['feed']['img']['src']
+					if len(message) > 1024:
+						message = message[:1020]
+						message += "..."
+					bot.send_photo(chat_id=chat, photo=src, caption=message, parse_mode=telegram.ParseMode.MARKDOWN)
+				except:	
+					tmp = message + html2markdown.convert(feed.entries[0].description)
+					try:
+						send_message(tmp, bot, chat)
+					except:
+						send_message(message, bot, chat)
 	conn.close()
 
 def init_bot():
