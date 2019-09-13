@@ -24,23 +24,21 @@ def check_new(conn, url, title):
 	sql = "SELECT ID FROM feeds WHERE URL = ?"
 	c.execute(sql, [url])
 	ids = c.fetchone()
-	new = True
+	new = False
 	if not ids:
 		sql = "INSERT INTO feeds (URL) VALUES (?);"
 		c.execute(sql, [url])
 		sql = "INSERT INTO entries (Feed, Title) VALUES (?, ?);"
 		c.execute(sql, [c.lastrowid, title])
+		new = False
 	else:
-		sql = "SELECT Title FROM entries WHERE Feed = ?"
-		c.execute(sql, [ids[0]])
+		sql = "SELECT Title FROM entries WHERE Feed = ? AND Title = ?"
+		c.execute(sql, [ids[0], title])
 		result = c.fetchall()
-		for res in result:
-			if res[0] == title:
-				new = False
-				break
-		if new:
+		if not result:
 			sql = "INSERT INTO entries (Feed, Title) VALUES (?, ?);"
 			c.execute(sql, [ids[0], title])
+			new = True
 	conn.commit()
 	return new
 
