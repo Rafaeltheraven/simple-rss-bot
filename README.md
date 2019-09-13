@@ -16,4 +16,8 @@ Simply run `bot.py` through a cronjob or some other scheduling system.
 # Install
 Simply run `pip install -r requirements.txt`
 
+On initial run, no messages will be send through Telegram, this is to prevent you from being spammed
+by hundreds of "new" messages when you have just added a new feed. If you see the `simple.db` file
+in your folder, then everything should be working properly.
+
 This program has only been tested on Python 3
