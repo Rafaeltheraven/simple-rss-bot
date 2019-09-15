@@ -5,6 +5,9 @@ from hashlib import sha1
 from json import dumps
 import telegram
 import html2markdown
+from time import mktime, time
+from datetime import datetime
+from dateutil import parser
 
 def connect_to_db():
 	if not os.path.exists('simple.db'):
@@ -15,11 +18,11 @@ def create_db():
 	conn = sqlite3.connect('simple.db')
 	c = conn.cursor()
 	c.execute('''CREATE TABLE feeds (ID INTEGER PRIMARY KEY, URL VARCHAR(2083) UNIQUE);''')
-	c.execute('''CREATE TABLE entries (ID INTEGER PRIMARY KEY, Feed INTEGER, Title VARCHAR(2083) UNIQUE, FOREIGN KEY(Feed) REFERENCES feeds(ID));''')
+	c.execute('''CREATE TABLE entries (ID INTEGER PRIMARY KEY, Feed INTEGER, Title VARCHAR(2083), PubDate DECIMAL UNIQUE, FOREIGN KEY(Feed) REFERENCES feeds(ID));''')
 	conn.commit()
 	conn.close()
 
-def check_new(conn, url, title):
+def check_new(conn, url, title, timestamp):
 	c = conn.cursor()
 	sql = "SELECT ID FROM feeds WHERE URL = ?"
 	c.execute(sql, [url])
@@ -29,20 +32,37 @@ def check_new(conn, url, title):
 	if not ids:
 		sql = "INSERT INTO feeds (URL) VALUES (?);"
 		c.execute(sql, [url])
-		sql = "INSERT INTO entries (Feed, Title) VALUES (?, ?);"
-		c.execute(sql, [c.lastrowid, title])
+		sql = "INSERT INTO entries (Feed, Title, PubDate) VALUES (?, ?, ?);"
+		c.execute(sql, [c.lastrowid, title, timestamp])
 		new = True
 		send = False
 	else:
-		sql = "SELECT Title FROM entries WHERE Feed = ? AND Title = ?"
-		c.execute(sql, [ids[0], title])
+		sql = "SELECT Title FROM entries WHERE Feed = ? AND Title = ? AND PubDate = ?"
+		c.execute(sql, [ids[0], title, timestamp])
 		result = c.fetchall()
 		if not result:
-			sql = "INSERT INTO entries (Feed, Title) VALUES (?, ?);"
-			c.execute(sql, [ids[0], title])
+			sql = "INSERT INTO entries (Feed, Title, PubDate) VALUES (?, ?, ?);"
+			c.execute(sql, [ids[0], title, timestamp])
 			send = True
 	conn.commit()
 	return new, send
+
+def get_timestamp(entry):
+	timestamp = 0
+	try:
+		timestamp = mktime(entry['published_parsed'])
+	except:
+		try:
+			timestamp = mktime(entry['updated_parsed'])
+		except:
+			try:
+				timestamp = mktime(parser.parse(entry['published'], fuzzy=True).timetuple())
+			except:
+				try:
+					timestamp = mktime(parser.parse(entry['updated'], fuzzy=True).timetuple())
+				except:
+					timestamp = time()
+	return timestamp
 
 def check_feed():
 	conn = connect_to_db()
@@ -58,11 +78,13 @@ def check_feed():
 			title = entry.title
 			desc = entry.description
 			link = entry.link
-			new, send = check_new(conn, url, title)
+			timestamp = get_timestamp(entry)
+			new, send = check_new(conn, url, title, timestamp)
 			if new:
 				for entry in feed['entries']:
 					title = entry.title
-					check_new(conn, url, title)
+					timestamp = get_timestamp(entry)
+					check_new(conn, url, title, timestamp)
 				break
 			elif send:
 				message = "**" + feed.feed.title + "** \n \n"
@@ -91,7 +113,7 @@ def init_bot():
 
 def send_message(message, bot, chat):
 	if len(message) > 1024:
-		message = message[:100]
+		message = message[:1020]
 		message += "..."
 	bot.sendMessage(text=message, chat_id=chat, parse_mode=telegram.ParseMode.MARKDOWN)
 
