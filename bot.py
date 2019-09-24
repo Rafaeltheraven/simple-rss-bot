@@ -65,7 +65,7 @@ def get_timestamp(entry):
 				try:
 					timestamp = mktime(parser.parse(entry['updated'], fuzzy=True).timetuple())
 				except:
-					timestamp = time()
+					timestamp = float(sha1(entry['title'].hexdigest())) # If absolutely no timestamp is possible, "hash" the title.
 	return timestamp
 
 def check_feed():
