@@ -42,8 +42,12 @@ def check_new(conn, url, title, timestamp):
 		result = c.fetchall()
 		if not result:
 			sql = "INSERT INTO entries (Feed, Title, PubDate) VALUES (?, ?, ?);"
-			c.execute(sql, [ids[0], title, timestamp])
-			send = True
+			try:
+				c.execute(sql, [ids[0], title, timestamp])
+				send = True
+			except sqlite3.IntegrityError:
+				print("Error inserting " + title + " - " + str(timestamp))
+				send = False
 	conn.commit()
 	return new, send
 
