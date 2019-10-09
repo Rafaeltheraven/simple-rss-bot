@@ -18,7 +18,7 @@ def create_db():
 	conn = sqlite3.connect('simple.db')
 	c = conn.cursor()
 	c.execute('''CREATE TABLE feeds (ID INTEGER PRIMARY KEY, URL VARCHAR(2083) UNIQUE);''')
-	c.execute('''CREATE TABLE entries (ID INTEGER PRIMARY KEY, Feed INTEGER, Title VARCHAR(2083), PubDate DECIMAL UNIQUE, FOREIGN KEY(Feed) REFERENCES feeds(ID));''')
+	c.execute('''CREATE TABLE entries (ID INTEGER PRIMARY KEY, Feed INTEGER, Title VARCHAR(2083), PubDate DECIMAL, FOREIGN KEY(Feed) REFERENCES feeds(ID), CONSTRAINT uniqueness UNIQUE (Title, PubDate));''')
 	conn.commit()
 	conn.close()
 
@@ -45,8 +45,8 @@ def check_new(conn, url, title, timestamp):
 			try:
 				c.execute(sql, [ids[0], title, timestamp])
 				send = True
-			except sqlite3.IntegrityError:
-				print("Error inserting " + title + " - " + str(timestamp))
+			except sqlite3.IntegrityError as e:
+				print("Error inserting " + title + " - " + str(timestamp) + ". Got error: " + e)
 				send = False
 	conn.commit()
 	return new, send
