@@ -1,6 +1,7 @@
 import feedparser
 import sqlite3
 import os
+import asyncio
 from hashlib import sha1
 from json import dumps
 import telegram
@@ -18,7 +19,9 @@ def create_db():
 	conn = sqlite3.connect('simple.db')
 	c = conn.cursor()
 	c.execute('''CREATE TABLE feeds (ID INTEGER PRIMARY KEY, URL VARCHAR(2083) UNIQUE);''')
-	c.execute('''CREATE TABLE entries (ID INTEGER PRIMARY KEY, Feed INTEGER, Title VARCHAR(2083), PubDate DECIMAL, FOREIGN KEY(Feed) REFERENCES feeds(ID), CONSTRAINT uniqueness UNIQUE (Title, PubDate));''')
+	c.execute('''CREATE TABLE entries (ID INTEGER PRIMARY KEY, Feed INTEGER, 
+	Title VARCHAR(2083), PubDate DECIMAL, FOREIGN KEY(Feed) REFERENCES 
+	feeds(ID), CONSTRAINT uniqueness UNIQUE (Title, PubDate, Feed));''')
 	conn.commit()
 	conn.close()
 
@@ -46,7 +49,7 @@ def check_new(conn, url, title, timestamp):
 				c.execute(sql, [ids[0], title, timestamp])
 				send = True
 			except sqlite3.IntegrityError as e:
-				print("Error inserting " + title + " - " + str(timestamp) + ". Got error: " + e)
+				print("Error inserting " + str(title) + " - " + str(timestamp) + ". Got error: " + str(e))
 				send = False
 	conn.commit()
 	return new, send
@@ -68,7 +71,7 @@ def get_timestamp(entry):
 					timestamp = float(sha1(entry['title'].hexdigest())) # If absolutely no timestamp is possible, "hash" the title.
 	return timestamp
 
-def check_feed():
+async def check_feed():
 	conn = connect_to_db()
 	with open("urls") as f:
 		content = f.readlines()
@@ -80,7 +83,11 @@ def check_feed():
 		feed = feedparser.parse(url)
 		for entry in feed['entries']:
 			title = entry.title
-			desc = entry.description
+			try:
+				desc = entry.description
+			except:
+				print(feed)
+				desc = "[COULD NOT RETRIEVE DESCRIPTION]"
 			link = entry.link
 			timestamp = get_timestamp(entry)
 			new, send = check_new(conn, url, title, timestamp)
@@ -99,13 +106,13 @@ def check_feed():
 					if len(message) > 1024:
 						message = message[:1020]
 						message += "..."
-					bot.send_photo(chat_id=chat, photo=src, caption=message, parse_mode=telegram.ParseMode.MARKDOWN)
+					await bot.send_photo(chat_id=chat, photo=src, caption=message, parse_mode=telegram.constants.ParseMode.MARKDOWN_V2)
 				except:	
 					tmp = message + html2markdown.convert(feed.entries[0].description)
 					try:
-						send_message(tmp, bot, chat)
+						await send_message(tmp, bot, chat)
 					except:
-						send_message(message, bot, chat)
+						await send_message(message, bot, chat)
 	conn.close()
 
 def init_bot():
@@ -115,11 +122,11 @@ def init_bot():
 	bot = telegram.Bot(token=content[0])
 	return bot, content[1]
 
-def send_message(message, bot, chat):
+async def send_message(message, bot, chat):
 	if len(message) > 1024:
 		message = message[:1020]
 		message += "..."
-	bot.sendMessage(text=message, chat_id=chat, parse_mode=telegram.ParseMode.MARKDOWN)
+	bot.sendMessage(text=message, chat_id=chat, parse_mode=telegram.constants.ParseMode.MARKDOWN)
 
 if __name__ == "__main__":
 	init = True
@@ -131,4 +138,4 @@ if __name__ == "__main__":
 		init = False
 	if not init:
 		exit()
-	check_feed()
+	asyncio.run(check_feed())
